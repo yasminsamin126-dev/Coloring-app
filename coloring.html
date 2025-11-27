@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <title>صفحة تلوين أونلاين</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #f4f4f4;
+      direction: rtl;
+    }
+    #toolbar {
+      position: fixed;
+      top: 0;
+      right: 0;
+      left: 0;
+      background: #ffffff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      z-index: 10;
+    }
+    #toolbar span {
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    .color {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid #ddd;
+      cursor: pointer;
+    }
+    #brushSize {
+      width: 80px;
+    }
+    button {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      background: #fafafa;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    button:active {
+      transform: scale(0.97);
+    }
+    #canvas {
+      position: absolute;
+      top: 56px; /* ارتفاع الشريط تقريباً */
+      left: 0;
+      right: 0;
+      bottom: 0;
+      touch-action: none; /* علشان التاتش يرسم مش يسكول */
+    }
+    #message {
+      position: fixed;
+      bottom: 8px;
+      right: 8px;
+      left: 8px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <span>اختار اللون:</span>
+    <div class="color" data-color="#e74c3c" style="background:#e74c3c"></div>
+    <div class="color" data-color="#27ae60" style="background:#27ae60"></div>
+    <div class="color" data-color="#2980b9" style="background:#2980b9"></div>
+    <div class="color" data-color="#f1c40f" style="background:#f1c40f"></div>
+    <div class="color" data-color="#8e44ad" style="background:#8e44ad"></div>
+    <span>حجم الفرشة:</span>
+    <input type="range" id="brushSize" min="3" max="25" value="6" />
+    <button id="clearBtn">مسح</button>
+    <button id="saveBtn">حفظ الصورة</button>
+  </div>
+
+  <canvas id="canvas"></canvas>
+  <div id="message"></div>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const toolbar = document.getElementById("toolbar");
+    const msgBox = document.getElementById("message");
+
+    let baseImage = new Image();
+    let imgLoaded = false;
+    let drawing = false;
+    let currentColor = "#e74c3c";
+    let brushSize = 6;
+    let lastX, lastY;
+
+    function showMessage(text) {
+      msgBox.textContent = text;
+      msgBox.style.display = text ? "block" : "none";
+    }
+
+    function getImageUrlFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("img");
+    }
+
+    function resizeCanvas() {
+      const toolbarHeight = toolbar.offsetHeight || 56;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight - toolbarHeight;
+      drawBaseImage();
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+
+    function loadImage() {
+      const url = getImageUrlFromQuery();
+      if (!url) {
+        showMessage("مفيش صورة في اللينك. لازم تضيف ?img=رابط_الصورة في آخر الرابط.");
+        resizeCanvas();
+        return;
+      }
+      showMessage("جاري تحميل صورة التلوين...");
+      baseImage = new Image();
+      baseImage.crossOrigin = "anonymous";
+      baseImage.onload = function () {
+        imgLoaded = true;
+        resizeCanvas();
+        showMessage("جاهز للتلوين 🎨");
+      };
+      baseImage.onerror = function () {
+        showMessage("مش قادر أحمّل الصورة. اتأكدي إن رابط الصورة صحيح ومباشر (png / jpg).");
+        resizeCanvas();
+      };
+      baseImage.src = url;
+    }
+
+    function drawBaseImage() {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (!imgLoaded) return;
+
+      const iw = baseImage.width;
+      const ih = baseImage.height;
+      const cw = canvas.width;
+      const ch = canvas.height;
+      const scale = Math.min(cw / iw, ch / ih);
+      const dw = iw * scale;
+      const dh = ih * scale;
+      const dx = (cw - dw) / 2;
+      const dy = (ch - dh) / 2;
+      ctx.drawImage(baseImage, dx, dy, dw, dh);
+    }
+
+    function startDrawing(x, y) {
+      drawing = true;
+      lastX = x;
+      lastY = y;
+    }
+
+    function draw(x, y) {
+      if (!drawing) return;
+      ctx.strokeStyle = currentColor;
+      ctx.lineWidth = brushSize;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      lastX = x;
+      lastY = y;
+    }
+
+    function stopDrawing() {
+      drawing = false;
+    }
+
+    // Mouse events
+    canvas.addEventListener("mousedown", (e) => {
+      startDrawing(e.offsetX, e.offsetY);
+    });
+    canvas.addEventListener("mousemove", (e) => {
+      draw(e.offsetX, e.offsetY);
+    });
+    canvas.addEventListener("mouseup", stopDrawing);
+    canvas.addEventListener("mouseleave", stopDrawing);
+
+    // Touch events
+    canvas.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const t = e.touches[0];
+      startDrawing(t.clientX - rect.left, t.clientY - rect.top);
+    });
+
+    canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const t = e.touches[0];
+      draw(t.clientX - rect.left, t.clientY - rect.top);
+    });
+
+    canvas.addEventListener("touchend", (e) => {
+      e.preventDefault();
+      stopDrawing();
+    });
+
+    // ألوان
+    document.querySelectorAll(".color").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        currentColor = btn.dataset.color;
+      });
+    });
+
+    // حجم الفرشة
+    document.getElementById("brushSize").addEventListener("input", (e) => {
+      brushSize = Number(e.target.value);
+    });
+
+    // مسح (نرجع الصورة الأصلية ونشيل الألوان)
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      drawBaseImage();
+    });
+
+    // حفظ
+    document.getElementById("saveBtn").addEventListener("click", () => {
+      const link = document.createElement("a");
+      link.download = "coloring.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+
+    loadImage();
+  </script>
+</body>
+</html>
